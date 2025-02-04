@@ -17,6 +17,7 @@ A series of bash and awk scripts that serve as wrappers to several python tools 
 5) Rename downloaded directories to charmm36m.ff and oplsaam.ff and add (as the first line in the file) charmm36m to the charmm36m.ff/forcefield.doc file and oplsaam to the oplsaam/forcefield.doc file
 6) Modify the HYDRC.bash file to activate the conda enviroment that contains ColabFold, Genice2, and PyPept. Ensure that GROMACS is in your path;
 7) run "source HYDRC.bash" to put everything in your working path and have your conda environment activate
+8) Copy the *.mdp files from this repo into your working directory <--This is needed to make the BuildGromacsInput_gmx/gmxmpi.bash work correctly.
  
    *Note: If your directory contains spaces (running in a windows directory from WSL2, for instance), the GMXLIB path in the HYDRC.bash file should be explicitly written with proper escape characters for GROMACS to
    find the forcefield directories. Be sure to check gmx pdb2gmx (or gmx_mpi) will run with an abriatry test PDB file from the RCSB after sourcing. Be sure to check that the conda enviroment is also activated
