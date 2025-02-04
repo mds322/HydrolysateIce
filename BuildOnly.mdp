@@ -1,0 +1,15 @@
+;This is a fake MDP file, DO NOT USE FOR SIMULATIONS!
+integrator              = steep
+emtol                   = 1000.0
+nsteps                  = 5000
+nstlist                 = 10
+cutoff-scheme           = Verlet
+rlist                   = 0.1
+vdwtype                 = Cut-off
+rvdw                    = 0.1
+coulombtype             = reaction-field
+rcoulomb                = 0.1
+;
+constraints		= none
+;constraints             = h-bonds
+;constraint_algorithm    = LINCS
