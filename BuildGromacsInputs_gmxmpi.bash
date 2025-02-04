@@ -16,15 +16,29 @@ if [ $# -eq 0 ] || [ $1 == "-h" ]; then
 	exit
 fi
 #Confirm Gromacs is in your $PATH and is executable
-if [ ! -x "$(command -v gmx_mpi)" ] && [ ! -x $(command -v gmx) ]; 
-	then echo "Missing Gromacs; are you sure you sourced HYDRC.bash?"; exit
+if [ ! -x "$(command -v gmx_mpi)" ] && [ ! -x $(command -v gmx) ]; then 
+	echo "Missing Gromacs; are you sure you sourced HYDRC.bash and/or GMXRC.bash?"; 
+	exit;
 fi
-if [ -x "$(command -v gmx)" ]; 
-	then echo "Non-MPI version of Gromacs found, use BuildScript_gmx.sh instead";
-		exit;
-	fi
+if [ -x "$(command -v gmx)" ]; then 
+	echo "Non-MPI version of Gromacs found, use BuildScript_gmx.sh instead";
+	exit;
+fi
+	
+#	else if [ -x "$(command -v gmx)"];then
+#	alias gmx1='gmx'
+#	fi
+#fi
 #Set default
 #tmp="$1";
+#Check that support scripts are in PATH and setup for use
+if [ -x "$(command -v DefineXYRepeatsForIce.awk)" ]; then 
+	  HYD=$(dirname $(which DefineXYRepeatsForIce.awk));
+	else 
+	  echo "Support Scripts missing? Did you remember to source HYDRC.bash?"
+	  exit
+fi
+	
 pdbName=$(echo "$tmp" | sed -e 's|.*/||' -e 's/\.pdb//g');
 pdb2gmx=1;
 pdb2gmxFF="charmm36m";
@@ -51,11 +65,6 @@ for((i=1;i<$limit;i++));do
 		fi		
 	fi
 
-	if [ $argvalue == "-fpdb2gmx" ];then
-		i=$(($i+1));
-		pdb2gmx=${!i};
-	fi
-	
 	if [ $argvalue == "-fpdb2gmxFF" ];then
 		i=$(($i+1));
 		pdb2gmxFF=${!i};
@@ -66,14 +75,15 @@ for((i=1;i<$limit;i++));do
 		WaterModel=${!i};
 	fi
 	
-	if [ $argvalue == "-fUseCustomTopology" ] && [ $pdb2gmx -eq 0 ]; then
-		i=$(($i+1));
-		UseCustomTopology=${!i};
+	if [ $argvalue == "-fUseCustomTopology" ]; then
+		UseCustomTopology=1;
+		pdb2gmx=0;
 	fi
 
-	if [ $argvalue == "-fCustomSoluteTopologyFile" ] && [ $pdb2gmx -eq 0 ]; then
+	if [ $argvalue == "-fCustomTopologyFile" ]; then
 		i=$(($i+1));
-		CustomTopology=${!i};
+		CustomTopo=${!i};
+		echo $CustomTopo;
 	fi
 
 	if [ $argvalue == "-fSoluteBoxEdgeDistance" ]; then
@@ -102,12 +112,12 @@ echo "Start Checks"
 LiquidWaterPercentTest=$(awk -v i=$LiquidWaterFraction 'BEGIN{if(i>0.8||i<0.1){print int(1)}else{print int(0)}}')
 SaltConcTest=$(awk -v i=$SaltConc 'BEGIN{if(i>0.5){print int(1)}else{print int(0)}}')
 
-	if [ -n "$CustomTopology" ] && [ ! $UseCustomTopology -eq 0 ] ; then
-	       echo "Error: Invalid Combination of input Flags: custom topology provided but UseCustomToplogy not set";
-	       exit
-	fi
+#	if [ -n "$CustomTopo" ] && [ ! $UseCustomTopology -eq 0 ] ; then
+#	       echo "Error: Invalid Combination of input Flags: custom topology provided but UseCustomToplogy not set";
+#	       exit
+#	fi
 
-	if [ ! -n "$CustomTopology" ] && [ $UseCustomTopology -eq 1 ] ; then
+	if [ ! -n "$CustomTopo" ] && [ $UseCustomTopology -eq 1 ] ; then
 	       echo "Error: Invalid Combination of input Flags: UseCustomToplogy set but no CustomToplogy Given";
 	       exit
 	fi
@@ -128,25 +138,27 @@ SaltConcTest=$(awk -v i=$SaltConc 'BEGIN{if(i>0.5){print int(1)}else{print int(0
 	fi
 #Start the building process
 echo "Running with these settings:"
-	if [[ $UseCustomTopoloy -eq 0 ]]; then  
+	if [ $pdb2gmx -eq 1 ]; then  
 		echo "input PDB" $tmp " pdb2gmxFF " $pdb2gmxFF " WaterModel " $WaterModel " SoluteBoxEdgeDistance " $SoluteBoxEdgeDistance " LiquidWaterFraction " $LiquidWaterFraction; 
 	else 
+		echo "--Warning-- Using Custom Topology: "$CustomTopo;
 		echo "input PDB" $tmp " WaterModel " $WaterModel " SoluteBoxEdgeDistance " $SoluteBoxEdgeDistance " LiquidWaterFraction " $LiquidWaterFraction; 
-		cp $CustomTopogy system_"$CustomTopology";
-		cp $tmp solute_"$pdbName".gro
+		cp $CustomTopo system_"$pdbName".top;
+		cp $tmp solute_"$pdbName".pdb
+		gmx editconf -f solute_"$pdbName".pdb -d "$SoluteBoxEdgeDistance" -o BoxedTmp_"$pdbName".gro;
 	fi
 
-	if [ $pdb2gmx -eq 1 ] || [ ! -n "$CustomTopology" ]; then
+	if [ $pdb2gmx -eq 1 ]; then
 		echo $PWD;
 		#GROMACS CHARMM36 has a known bug if the first residue is MET; This checks for this and performs a work around 
 		Metcheck=$(awk '{if($0~/ATOM/){if($4=="MET"){print "1";exit}else{print 0;exit}}}' $tmp) ;
 		if [ $pdb2gmxFF == "charmm36m"  ] && [ "$Metcheck" -eq 1 ]; then
-			echo -e "1 \r 0 \r" | gmx_mpi pdb2gmx -f "$tmp" -ff "$pdb2gmxFF" -water "$WaterModel" -ignh -o solute_"$pdbName".gro -p system_"$pdbName".top -i posre_"$pdbName".itp -ter;
+			echo -e "1 \r 0 \r" | gmx pdb2gmx -f "$tmp" -ff "$pdb2gmxFF" -water "$WaterModel" -ignh -o solute_"$pdbName".gro -p system_"$pdbName".top -i posre_"$pdbName".itp -ter;
 		else 
-			gmx_mpi pdb2gmx -f "$tmp" -ff "$pdb2gmxFF" -water "$WaterModel" -ignh -o solute_"$pdbName".gro -p system_"$pdbName".top -i posre_"$pdbName".itp;
+			gmx pdb2gmx -f "$tmp" -ff "$pdb2gmxFF" -water "$WaterModel" -ignh -o solute_"$pdbName".gro -p system_"$pdbName".top -i posre_"$pdbName".itp;
 		fi
+		gmx editconf -f solute_"$pdbName".gro -d "$SoluteBoxEdgeDistance" -o BoxedTmp_"$pdbName".gro;
 	fi
-		gmx_mpi editconf -f solute_"$pdbName".gro -d "$SoluteBoxEdgeDistance" -o BoxedTmp_"$pdbName".gro;
 #Get BoxDims 
 	BoxDims=$(tail -n 1 BoxedTmp_"$pdbName".gro);
 	echo "Box " $BoxDims;
@@ -156,10 +168,13 @@ echo "Running with these settings:"
 	WaterInSingleLayer=$(genice2 --rep $Layer 1 1h --format xyz 2>/dev/null | awk '{if($1=="O"){count++}}END{print count}');
 	echo "WaterInSingleLayer" $WaterInSingleLayer;
 #Generate Liquid Water Region
-	gmx_mpi solvate -cp BoxedTmp_"$pdbName".gro -cs WaterModels/"$WaterModel".gro -o solvated_"$pdbName".gro -p system_"$pdbName".top 2>solvateLog; #1>/dev/null  
-	gmx_mpi grompp -f BuildOnly.mdp -p system_"$pdbName".top -c solvated_"$pdbName".gro -o LiquidSystem_"$pdbName".tpr ;
-	gmx_mpi select -s LiquidSystem_"$pdbName".tpr -f solvated_"$pdbName".gro -select "resname SOL" -on StartLiquidWater_"$pdbName".ndx;
-	sed -i 's/resname_SOL/SOL/' StartLiquidWater_"$pdbName".ndx 
+	gmx solvate -cp BoxedTmp_"$pdbName".gro -cs WaterModels/"$WaterModel".gro -o solvated_"$pdbName".gro -p system_"$pdbName".top 2>solvateLog; #1>/dev/null  
+#We can only neutralize if a custom topology isn't used; so check and skip if needed
+	if [ $pdb2gmx -eq 1 ]; then
+		gmx grompp -f BuildOnly.mdp -p system_"$pdbName".top -c solvated_"$pdbName".gro -o LiquidSystem_"$pdbName".tpr ;
+		gmx select -s LiquidSystem_"$pdbName".tpr -f solvated_"$pdbName".gro -select "resname SOL" -on StartLiquidWater_"$pdbName".ndx;
+		sed -i 's/resname_SOL/SOL/' StartLiquidWater_"$pdbName".ndx
+	fi
 #Remove extra files (part 1)
 	rm BoxedTmp_"$pdbName".gro solute_"$pdbName".gro;
 	LiquidWaterNumber=$(grep "Number of solvent" solvatelog | awk '{print $5}');
@@ -171,7 +186,7 @@ echo "Running with these settings:"
 #Use GenIce and generate the Ice Phase of the box
 	genice2 --rep $Layer $ZLayerCount 1h --water $WaterModel >BoxedIce_"$pdbName".gro;
 #Translate ice to one side of the box, add a small buffer 
-	gmx_mpi editconf -f BoxedIce_"$pdbName".gro -translate 0 0 $(echo $BoxDims | awk '{print $3*1.025}') -o mergeReady_"$pdbName".gro;
+	gmx editconf -f BoxedIce_"$pdbName".gro -translate 0 0 $(echo $BoxDims | awk '{print $3*1.025}') -o mergeReady_"$pdbName".gro;
 #get number of atoms in both boxes and get ready to merge
 	TotalAtoms=$(awk 'FNR==2{a+=$0;nextfile}END{print a}' BoxedIce_"$pdbName".gro solvated_"$pdbName".gro);
 #get Correct ZDim For merge
@@ -180,20 +195,27 @@ echo "Running with these settings:"
 	sed '$d' solvated_"$pdbName".gro > tmp_"$pdbName" ;
 	sed '1,2d' mergeReady_"$pdbName".gro > tmp2_"$pdbName" ;
 	sed -i '$d' tmp2_"$pdbName" ;
+#Correct GRO file for new atoms and add to topology file
 	awk -v Atoms=$TotalAtoms -v z=$ZDims -v x="$XYDims" 'NR==2{print "Merged";print Atoms}NR>2{print $0}END{print x, z}'  tmp_"$pdbName" tmp2_"$pdbName" > mergedSystem_"$pdbName".gro
 	NewSOL=$(grep SOL mergedSystem_"$pdbName".gro | awk '{if($0~/OW/){count++}}END{print count}');
 	sed -i "/^SOL/s/.*/SOL $NewSOL/" system_"$pdbName".top 
-#Now to neutralize the system by replacing liquid waters only
+#Now to neutralize the system by replacing liquid waters only (Only if not using a custom topology)
+ 	if [ $pdb2gmx -eq 0 ]; then
+		echo "Custom Topology was used. Double check your topology (maybe add the correct tip5p or tip4p.itp files?) and manually neutralize"
+		echo "System Generated"
+		exit
+	fi
 #NOTE MW1 and LP1 and MW2 and LP2 are equivilent so we are ignoring warnings, but strictly we should be renaming first and then running
-	gmx_mpi grompp -f BuildOnly.mdp -p system_"$pdbName".top -c mergedSystem_"$pdbName".gro -o addIons_"$pdbName".tpr -maxwarn 2
+	gmx grompp -f BuildOnly.mdp -p system_"$pdbName".top -c mergedSystem_"$pdbName".gro -o addIons_"$pdbName".tpr -maxwarn 2
 	if [ $pdb2gmxFF=="charmm36m" ]; then 
-	gmx_mpi genion -s addIons_"$pdbName".tpr -p system_"$pdbName".top -n StartLiquidWater_"$pdbName".ndx -neutral --conc $SaltConc -pname SOD -nname CLA -o CompleteNeutralized_"$pdbName".gro;
+	gmx genion -s addIons_"$pdbName".tpr -p system_"$pdbName".top -n StartLiquidWater_"$pdbName".ndx -neutral --conc $SaltConc -pname SOD -nname CLA -o CompleteNeutralized_"$pdbName".gro;
 	else 
-	gmx_mpi genion -s addIons_"$pdbName".tpr -p system_"$pdbName".top -n StartLiquidWater_"$pdbName".ndx -neutral -conc $SaltConc -pname NA -nname CL -o CompleteNeutralized_"$pdbName".gro;
+	gmx genion -s addIons_"$pdbName".tpr -p system_"$pdbName".top -n StartLiquidWater_"$pdbName".ndx -neutral -conc $SaltConc -pname NA -nname CL -o CompleteNeutralized_"$pdbName".gro;
 	fi
 #When adding salts, because we add only to liquid water region, we need to sort the GRO file and move the ions to the end to match the topology
 	awk 'NR<3{print $0}NR>2{if($0!~/NA/&&$0!~/CLA/&&$0!~/CL/&&$0!~/SOD/&&NF!=3){print $0}else{a[count++]=$0}}END{for(i=0;i<count;i++){print a[i]}}' CompleteNeutralized_"$pdbName".gro > sorted_"$pdbName".gro;
 	mv sorted_"$pdbName".gro CompleteNeutralized_"$pdbName".gro;
 #Finally generate energy minimization tpr file	
-gmx_mpi grompp -f EM_min.mdp -p system_"$pdbName".top -c CompleteNeutralized_"$pdbName".gro -o em_"$pdbName".tpr
+gmx grompp -f EM_min.mdp -p system_"$pdbName".top -c CompleteNeutralized_"$pdbName".gro -o em_"$pdbName".tpr
 #Clean Up tmpFiles
+rm StartLiquidWater_*;

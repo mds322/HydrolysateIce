@@ -87,7 +87,7 @@ if [ ! $check -eq 0 ]; then
 		if [ ! -d $name_out/short_"$i" ]; then
 			mkdir "$name"_out/short_"$i";
 		fi
-		echo run_pyPept --fasta $i --prefix "$name"_out/short_"$i"/"$i";
+		run_pyPept --fasta $i --prefix "$name"_out/short_"$i"/"$i";
 		#PyPept Gives non-standard namining of atoms for his and GLN
 		#We need to fix this with the sed script below
 		sed -e 's/CD1 HIS/CD2 HSD/g' -e 's/NE1 HIS/NE2 HSD/g' -e 's/CE2 HIS/CE1 HSD/g' -e 's/ND2 HIS/ND1 HSD/g' -e 's/HIS/HSD/g' -e 's/NE1 GLN/NE2 GLN/g' -e 's/OE2 GLN/OE1 GLN/g' "$name"_out/short_"$i"/"$i".pdb > tmp_"$i";
