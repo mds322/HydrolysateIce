@@ -3,22 +3,30 @@ A series of bash and awk scripts that serve as wrappers to several python tools 
 
 #Dependencies
 •ColabFold (https://github.com/sokrypton/ColabFold) && (https://github.com/YoshitakaMo/localcolabfold)
+
 •PyPept (https://github.com/Boehringer-Ingelheim/pyPept)
+
 •GenIce2 (https://github.com/vitroid/GenIce)
+
 •GROMACS (https://www.gromacs.org) ;version > 4.5
-•GROMACS Force-field Files:CHARMM36m and OPLS-AA/M force-fields; these must be obtained from the respective groups (https://mackerell.umaryland.edu/) & (https://zarbi.chem.yale.edu/)
+
+•GROMACS Force-field Files: CHARMM36m and OPLS-AA/M force-fields; these must be obtained from the respective groups (https://mackerell.umaryland.edu/) & (https://zarbi.chem.yale.edu/)
+
+•(Optional, but higly suggested) •PSSPred (https://zhanggroup.org/PSSpred/); note: Be sure to also download the non-reduntant library for PSSPred from the Zhang Lab webpage.
+
 
 #Setup/Install
 
 1) Download/clone this repo
 2) Generate a conda (or python virtual environment) and install Colabfold (AlphaFold2), PyPept, and GenIce2
-3) Install GROMACS
-4) Download CHARMM36M and OPLS-AA/M (gromacs formatted) force-field directories and place into cloned repo directory
-5) Rename downloaded directories to charmm36m.ff and oplsaam.ff and add (as the first line in the file) charmm36m to the charmm36m.ff/forcefield.doc file and oplsaam to the oplsaam/forcefield.doc file
-6) Modify the HYDRC.bash file to activate the conda enviroment that contains ColabFold, Genice2, and PyPept. Ensure that GROMACS is in your path;
-7) run "source HYDRC.bash" to put everything in your working path and have your conda environment activate
-8) Copy the *.mdp files from this repo into your working directory <--This is needed to make the BuildGromacsInput_gmx/gmxmpi.bash work correctly.
-9) Copy the WaterModels directory to your working directory <--This also is needed to make BuildGromacsInput_gmx/gmxmpi.bash script work correctly.
+3) Download and install PSSPred
+4) Install GROMACS
+5) Download CHARMM36M and OPLS-AA/M (gromacs formatted) force-field directories and place into cloned repo directory
+6) Rename downloaded directories to charmm36m.ff and oplsaam.ff and add (as the first line in the file) charmm36m to the charmm36m.ff/forcefield.doc file and oplsaam to the oplsaam/forcefield.doc file
+7) Modify the HYDRC.bash file to activate the conda enviroment that contains ColabFold, Genice2, PyPept, and PSSPred. Ensure that GROMACS is in your path;
+9) run "source HYDRC.bash" to put everything in your working path and have your conda environment activate
+10) Copy the *.mdp files from this repo into your working directory <--This is needed to make the BuildGromacsInput_gmx/gmxmpi.bash work correctly.
+11) Copy the WaterModels directory to your working directory <--This also is needed to make BuildGromacsInput_gmx/gmxmpi.bash script work correctly.
  
    *Note: If your directory contains spaces (running in a windows directory from WSL2, for instance), the GMXLIB path in the HYDRC.bash file should be explicitly written with proper escape characters for GROMACS to
    find the forcefield directories. Be sure to check gmx pdb2gmx (or gmx_mpi) will run with an abriatry test PDB file from the RCSB after sourcing. Be sure to check that the conda enviroment is also activated
@@ -47,7 +55,7 @@ for i in `find Hydrolysates_out | grep "*.pdb"`;do BuildGromacsInput_gmx.bash -f
 
 There are additional options for each of the three scripts that do provide some flexiblity in usage (see below).
 
-=========================================================================================================================
+====================================================================================================================
 Options for TrypsinCutter.awk
 
 The TrypsinCutter.awk script essentially recreates the "simple" trypsin cutting model from the Expasy Peptide Cutter webserver (see: https://web.expasy.org/peptide_cutter/peptidecutter_enzymes.html) as a stand-alone script. One additional option that is added here; however, is that multiple proteins can be processed at a time. Thus there are two usage modes.
@@ -60,7 +68,7 @@ TrypsinCutter.awk -v multi=1 (your raw, not FASTA sequence file here)
 
 In usage 1; the output (to StdOut) is the series of hydrolysates for the input sequence (or sequences) without no notation as to what the original sequence was. In usage 2, a special line break (starting with "+++Input" is printed between lists of hydrolysates from different input sequences. 
 
-=========================================================================================================================
+===============================================================================================================
 Options for 3DPredict.bash
 
 The 3DPredict.bash script provides a wrapper to format output from the Trypsin cutter (or a FASTA file or a file where each row is a different raw seqeuence) into the necessary input for ColabFold and/or PyPept. At the moment it is hardcoded that any hydrolysate with a sequence < 35AA in length will have its secondary structure predicted and then an accompanying 3D structure conformer generated by pyPept, and anything longer than 35AA in length will have its structure predicted by Colabfold. Since predictions of protein structures can be slow, the colabfold_batch predictions are used and predictions are made on groups of no more than 10 at a time. Additionally, if users wish to avoid generating large hydrolysates, the option to skip models greater than 35 AA in length is also avaialble.
